@@ -1,0 +1,166 @@
+// Prisma schema - Motorcycle Repair Website CMS
+// All entities have SEO fields for technical SEO optimization
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Admin user for the CMS panel
+model AdminUser {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  name      String?
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Category = dynamic SEO page (e.g. "تعمیر موتورگلکسی در مشهد")
+// Admin can create unlimited categories dynamically with full SEO control
+model Category {
+  id              String   @id @default(cuid())
+  title           String
+  slug            String   @unique
+  brand           String?  // motorcycle brand: galaxy, benelli, cross, aprilia...
+  city            String?  // city: mashhad, tehran...
+  shortDescription String? // for listing cards
+  content         String? // long SEO markdown body for the page
+  image           String? // cover image URL
+  icon            String?  // lucide icon name
+  // SEO fields
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  canonicalUrl    String?
+  ogImage         String?
+  structuredData  String? // JSON-LD override
+  // Hierarchy (optional sub-categories)
+  parentId        String?
+  parent          Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children        Category[] @relation("CategoryHierarchy")
+  // Relations
+  articles        Article[]
+  // Display
+  featured        Boolean  @default(false)
+  published       Boolean  @default(true)
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([published])
+  @@index([featured])
+}
+
+// Article / blog post
+model Article {
+  id              String   @id @default(cuid())
+  title           String
+  slug            String   @unique
+  excerpt         String?
+  content         String   // markdown content
+  coverImage      String?
+  // SEO fields
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  canonicalUrl    String?
+  ogImage         String?
+  structuredData  String?
+  // Relations
+  categoryId      String?
+  category        Category? @relation(fields: [categoryId], references: [id])
+  // Meta
+  authorName      String?
+  readingTime     Int?     // minutes
+  tags            String?  // comma-separated
+  featured        Boolean  @default(false)
+  published       Boolean  @default(true)
+  publishedAt     DateTime?
+  views           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([published])
+  @@index([featured])
+  @@index([publishedAt])
+}
+
+// Service offered by the repair shop
+model Service {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  icon        String?
+  image       String?
+  price       String?  // "توافقی", "از 500 هزار تومان", etc.
+  features    String?  // JSON array string
+  published   Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Singleton site settings (one row only)
+model SiteSettings {
+  id              String   @id @default("singleton")
+  // Brand
+  siteName        String?
+  siteDescription String?
+  logoText        String?
+  // Contact
+  phone           String?
+  whatsapp        String?
+  email           String?
+  address         String?
+  workingHours    String?
+  mapEmbed        String?
+  instagram       String?
+  telegram        String?
+  // About
+  aboutTitle      String?
+  aboutContent    String? // markdown
+  aboutImage      String?
+  // Hero
+  heroBadge       String?
+  heroTitle       String?
+  heroSubtitle    String?
+  heroImage       String?
+  heroCtaText     String?
+  // Homepage extras
+  features        String? // JSON array
+  stats           String? // JSON array of {label,value,suffix}
+  // Footer
+  footerText      String?
+  // Global SEO
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  ogImage         String?
+  // Theme
+  primaryColor    String? // override brand color
+  updatedAt       DateTime @updatedAt
+}
+
+// Contact form submissions
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  subject   String?
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([read])
+  @@index([createdAt])
+}
