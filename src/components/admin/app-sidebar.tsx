@@ -8,6 +8,7 @@ import {
   Layers,
   FileText,
   Wrench,
+  Image as ImageIcon,
   Mail,
   Settings,
   LogOut,
@@ -32,28 +33,71 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { LogoutButton } from "./logout-button";
 
+type ModuleKey =
+  | "dashboard"
+  | "articles"
+  | "categories"
+  | "services"
+  | "media"
+  | "messages"
+  | "settings"
+  | "users";
+
 type NavItem = {
   title: string;
   href: string;
   icon: LucideIcon;
+  module: ModuleKey;
   badgeKey?: "unread";
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { title: "داشبورد", href: "/admin", icon: LayoutDashboard },
-  { title: "دسته‌بندی‌ها", href: "/admin/categories", icon: Layers },
-  { title: "مقالات", href: "/admin/articles", icon: FileText },
-  { title: "خدمات", href: "/admin/services", icon: Wrench },
-  { title: "پیام‌ها", href: "/admin/messages", icon: Mail, badgeKey: "unread" },
-  { title: "تنظیمات سایت", href: "/admin/settings", icon: Settings },
+  { title: "داشبورد", href: "/admin", icon: LayoutDashboard, module: "dashboard" },
+  { title: "دسته‌بندی‌ها", href: "/admin/categories", icon: Layers, module: "categories" },
+  { title: "مقالات", href: "/admin/articles", icon: FileText, module: "articles" },
+  { title: "خدمات", href: "/admin/services", icon: Wrench, module: "services" },
+  { title: "رسانه‌ها", href: "/admin/media", icon: ImageIcon, module: "media" },
+  { title: "پیام‌ها", href: "/admin/messages", icon: Mail, module: "messages", badgeKey: "unread" },
+  { title: "تنظیمات سایت", href: "/admin/settings", icon: Settings, module: "settings" },
 ];
 
 interface AppSidebarProps {
   unreadMessages?: number;
+  canAccessArticles?: boolean;
+  canAccessCategories?: boolean;
+  canAccessServices?: boolean;
+  canAccessMedia?: boolean;
+  canAccessMessages?: boolean;
+  canAccessUsers?: boolean;
+  canAccessSettings?: boolean;
+  canAccessDashboard?: boolean;
 }
 
-export function AppSidebar({ unreadMessages = 0 }: AppSidebarProps) {
+export function AppSidebar({
+  unreadMessages = 0,
+  canAccessArticles = true,
+  canAccessCategories = true,
+  canAccessServices = true,
+  canAccessMedia = true,
+  canAccessMessages = true,
+  canAccessUsers = false,
+  canAccessSettings = false,
+  canAccessDashboard = true,
+}: AppSidebarProps) {
   const pathname = usePathname();
+
+  const accessMap: Record<ModuleKey, boolean> = {
+    dashboard: canAccessDashboard,
+    articles: canAccessArticles,
+    categories: canAccessCategories,
+    services: canAccessServices,
+    media: canAccessMedia,
+    messages: canAccessMessages,
+    settings: canAccessSettings,
+    users: canAccessUsers,
+  };
+
+  const visibleItems = NAV_ITEMS.filter((item) => accessMap[item.module]);
 
   return (
     <Sidebar side="right" className="bg-sidebar text-sidebar-foreground">
@@ -86,7 +130,7 @@ export function AppSidebar({ unreadMessages = 0 }: AppSidebarProps) {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => {
+              {visibleItems.map((item) => {
                 const isActive =
                   item.href === "/admin"
                     ? pathname === "/admin"

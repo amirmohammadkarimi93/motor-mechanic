@@ -6,6 +6,11 @@ import Link from "next/link";
 import { Phone, CalendarClock, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+interface PopularSearch {
+  label: string;
+  href: string;
+}
+
 interface HeroSectionProps {
   badge?: string | null;
   title?: string | null;
@@ -14,6 +19,7 @@ interface HeroSectionProps {
   ctaText?: string | null;
   phone?: string | null;
   stats?: { label: string; value: string; suffix?: string }[];
+  popularSearches?: PopularSearch[];
 }
 
 export function HeroSection({
@@ -24,6 +30,7 @@ export function HeroSection({
   ctaText,
   phone,
   stats = [],
+  popularSearches = [],
 }: HeroSectionProps) {
   return (
     <section className="relative isolate overflow-hidden bg-ink text-white min-h-[88vh] flex items-center">
@@ -125,11 +132,32 @@ export function HeroSection({
             </Button>
           </motion.div>
 
+          {popularSearches.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="mt-7 flex flex-wrap items-center gap-x-2 gap-y-2"
+            >
+              <span className="text-xs text-white/60">جستجوی پرطرفدار:</span>
+              {popularSearches.map((s) => (
+                <Link
+                  key={s.href}
+                  href={s.href}
+                  className="inline-flex items-center gap-1 rounded-full bg-white/5 border border-white/15 hover:bg-brand-500/20 hover:border-brand-400/50 hover:text-brand-200 text-white/85 text-xs font-medium transition-all px-3 py-1.5"
+                >
+                  {s.label}
+                  <ChevronLeft className="w-3 h-3 opacity-70" />
+                </Link>
+              ))}
+            </motion.div>
+          )}
+
           {stats && stats.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
+              transition={{ duration: 0.6, delay: 0.5 }}
               className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 max-w-2xl"
             >
               {stats.slice(0, 4).map((s, i) => (

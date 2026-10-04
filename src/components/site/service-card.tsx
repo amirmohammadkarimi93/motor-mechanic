@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, ChevronLeft } from "lucide-react";
+import Link from "next/link";
+import { Check, ChevronLeft, Phone } from "lucide-react";
 import { DynamicIcon } from "./icon";
 import { Badge } from "@/components/ui/badge";
 
@@ -18,6 +19,7 @@ interface ServiceCardData {
 interface ServiceCardProps {
   service: ServiceCardData;
   index?: number;
+  phone?: string | null;
 }
 
 function parseFeatures(features?: string | null): string[] {
@@ -34,7 +36,7 @@ function parseFeatures(features?: string | null): string[] {
   return [];
 }
 
-export function ServiceCard({ service, index = 0 }: ServiceCardProps) {
+export function ServiceCard({ service, index = 0, phone }: ServiceCardProps) {
   const features = parseFeatures(service.features).slice(0, 4);
 
   return (
@@ -43,12 +45,12 @@ export function ServiceCard({ service, index = 0 }: ServiceCardProps) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
       transition={{ duration: 0.4, delay: (index % 3) * 0.08 }}
-      className="group relative rounded-xl bg-card border border-border shadow-sm hover:shadow-xl hover:border-brand-300 transition-all overflow-hidden"
+      className="group relative rounded-xl bg-card border border-border shadow-sm hover:shadow-xl hover:border-brand-300 transition-all overflow-hidden flex flex-col"
     >
       {/* Top accent bar */}
       <div className="h-1 bg-gradient-to-l from-brand-500 to-brand-700 origin-right scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
 
-      <div className="p-5 md:p-6">
+      <div className="p-5 md:p-6 flex flex-col flex-1">
         <div className="flex items-start justify-between gap-3">
           <div className="w-12 h-12 rounded-lg bg-brand-50 group-hover:bg-brand-500 flex items-center justify-center transition-colors">
             <DynamicIcon
@@ -92,19 +94,30 @@ export function ServiceCard({ service, index = 0 }: ServiceCardProps) {
           </ul>
         )}
 
-        <div className="mt-5 pt-4 border-t border-border flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            برای دریافت نوبت تماس بگیرید
-          </span>
-          <a
-            href="tel:0513333333"
-            className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:text-brand-800 transition-colors"
+        <div className="mt-5 pt-4 border-t border-border flex items-center justify-between gap-2">
+          <Link
+            href="/contact"
+            className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:text-brand-800 transition-colors group/link"
           >
-            تماس
-            <ChevronLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" />
-          </a>
+            اطلاعات بیشتر
+            <ChevronLeft className="w-3.5 h-3.5 transition-transform group-hover/link:-translate-x-0.5" />
+          </Link>
+          {phone ? (
+            <a
+              href={`tel:${phone}`}
+              className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:text-brand-800 transition-colors"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              تماس
+            </a>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              برای دریافت نوبت تماس بگیرید
+            </span>
+          )}
         </div>
       </div>
     </motion.article>
   );
 }
+

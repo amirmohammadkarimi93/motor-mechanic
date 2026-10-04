@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Search, Plus, Trash2, Pencil, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,7 +35,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArticleFormSheet } from "./article-form-sheet";
 import type { ArticleWithRelations } from "./types";
 
 interface ArticlesTableProps {
@@ -46,6 +46,10 @@ interface ArticlesTableProps {
   categoryId: string;
   published: string;
   categories: { id: string; title: string }[];
+  /** Current user id — used for author-level RBAC */
+  currentUserId?: string;
+  /** Permission level for the articles module */
+  permissionLevel: "none" | "own" | "all";
 }
 
 export function ArticlesTable({
@@ -57,14 +61,14 @@ export function ArticlesTable({
   categoryId,
   published,
   categories,
+  currentUserId,
+  permissionLevel,
 }: ArticlesTableProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [searchValue, setSearchValue] = useState(search);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [editing, setEditing] = useState<ArticleWithRelations | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -98,7 +102,7 @@ export function ArticlesTable({
     try {
       const res = await fetch(`/api/admin/articles/${id}`, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok || !data.ok) {
+      if (!res.ok) {
         toast.error(data.error || "حذف ناموفق بود");
         return;
       }
@@ -111,13 +115,12 @@ export function ArticlesTable({
     }
   }
 
-  function openCreate() {
-    setEditing(null);
-    setSheetOpen(true);
-  }
-  function openEdit(a: ArticleWithRelations) {
-    setEditing(a);
-    setSheetOpen(true);
+  // RBAC: a row is editable/deletable by the user if their permission level is "all",
+  // or if it is "own" and the article belongs to them.
+  function canManage(item: ArticleWithRelations): boolean {
+    if (permissionLevel === "all") return true;
+    if (permissionLevel === "own") return item.authorId === currentUserId;
+    return false;
   }
 
   return (
@@ -158,9 +161,14 @@ export function ArticlesTable({
               <SelectItem value="featured">منتخب</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={openCreate} className="bg-brand-600 hover:bg-brand-700 text-white">
-            <Plus className="size-4" />
-            افزودن مقاله جدید
+          <Button
+            asChild
+            className="bg-brand-600 hover:bg-brand-700 text-white"
+          >
+            <Link href="/admin/articles/new">
+              <Plus className="size-4" />
+              افزودن مقاله جدید
+            </Link>
           </Button>
         </div>
       </div>
@@ -188,100 +196,109 @@ export function ArticlesTable({
                 </TableCell>
               </TableRow>
             ) : (
-              items.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="font-medium max-w-[280px]">
-                    <div className="flex flex-col">
-                      <span className="truncate">{a.title}</span>
-                      <span className="text-xs text-muted-foreground font-mono">
-                        /{a.slug}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-sm">
-                    {a.category ? (
-                      <Badge variant="outline">{a.category.title}</Badge>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {a.published ? (
-                        <Badge className="bg-emerald-500 hover:bg-emerald-500 text-white">
-                          منتشر
-                        </Badge>
+              items.map((a) => {
+                const manageable = canManage(a);
+                return (
+                  <TableRow key={a.id}>
+                    <TableCell className="font-medium max-w-[280px]">
+                      <div className="flex flex-col">
+                        <span className="truncate">{a.title}</span>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          /{a.slug}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm">
+                      {a.category ? (
+                        <Badge variant="outline">{a.category.title}</Badge>
                       ) : (
-                        <Badge variant="secondary">پیش‌نویس</Badge>
+                        "—"
                       )}
-                      {a.featured && (
-                        <Badge className="bg-brand-500 hover:bg-brand-500 text-white">
-                          منتخب
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
-                    {a.publishedAt
-                      ? new Intl.DateTimeFormat("fa-IR", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        }).format(a.publishedAt)
-                      : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm tabular-nums">
-                    {a.views.toLocaleString("fa-IR")}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        onClick={() => openEdit(a)}
-                        aria-label="ویرایش"
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {a.published ? (
+                          <Badge className="bg-emerald-500 hover:bg-emerald-500 text-white">
+                            منتشر
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">پیش‌نویس</Badge>
+                        )}
+                        {a.featured && (
+                          <Badge className="bg-brand-500 hover:bg-brand-500 text-white">
+                            منتخب
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                      {a.publishedAt
+                        ? new Intl.DateTimeFormat("fa-IR", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          }).format(a.publishedAt)
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm tabular-nums">
+                      {a.views.toLocaleString("fa-IR")}
+                    </TableCell>
+                    <TableCell>
+                      {manageable ? (
+                        <div className="flex gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="size-8 hover:bg-destructive/10 hover:text-destructive"
-                            disabled={deletingId === a.id}
-                            aria-label="حذف"
+                            className="size-8"
+                            asChild
+                            aria-label="ویرایش"
                           >
-                            {deletingId === a.id ? (
-                              <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="size-4" />
-                            )}
+                            <Link href={`/admin/articles/${a.id}`}>
+                              <Pencil className="size-4" />
+                            </Link>
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>حذف مقاله</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              آیا از حذف مقاله «{a.title}» مطمئن هستید؟ این عمل قابل بازگشت نیست.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>انصراف</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(a.id)}
-                              className="bg-destructive text-white hover:bg-destructive/90"
-                            >
-                              حذف
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8 hover:bg-destructive/10 hover:text-destructive"
+                                disabled={deletingId === a.id}
+                                aria-label="حذف"
+                              >
+                                {deletingId === a.id ? (
+                                  <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="size-4" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>حذف مقاله</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  آیا از حذف مقاله «{a.title}» مطمئن هستید؟ این عمل قابل بازگشت نیست.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>انصراف</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDelete(a.id)}
+                                  className="bg-destructive text-white hover:bg-destructive/90"
+                                >
+                                  حذف
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -314,16 +331,6 @@ export function ArticlesTable({
           </div>
         </div>
       )}
-
-      <ArticleFormSheet
-        open={sheetOpen}
-        onOpenChange={(v) => {
-          setSheetOpen(v);
-          if (!v) setEditing(null);
-        }}
-        article={editing}
-        categories={categories}
-      />
     </div>
   );
 }

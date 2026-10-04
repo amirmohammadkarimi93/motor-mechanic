@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { getSession, canAccess } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -34,9 +34,29 @@ export default async function AdminLayout({
     // ignore db errors
   }
 
+  // Compute per-module access from session role for sidebar visibility
+  const canAccessArticles = canAccess(session.role, "articles");
+  const canAccessCategories = canAccess(session.role, "categories");
+  const canAccessServices = canAccess(session.role, "services");
+  const canAccessMedia = canAccess(session.role, "media");
+  const canAccessMessages = canAccess(session.role, "messages");
+  const canAccessUsers = canAccess(session.role, "users");
+  const canAccessSettings = canAccess(session.role, "settings");
+  const canAccessDashboard = canAccess(session.role, "dashboard");
+
   return (
     <SidebarProvider>
-      <AppSidebar unreadMessages={unreadMessages} />
+      <AppSidebar
+        unreadMessages={unreadMessages}
+        canAccessArticles={canAccessArticles}
+        canAccessCategories={canAccessCategories}
+        canAccessServices={canAccessServices}
+        canAccessMedia={canAccessMedia}
+        canAccessMessages={canAccessMessages}
+        canAccessUsers={canAccessUsers}
+        canAccessSettings={canAccessSettings}
+        canAccessDashboard={canAccessDashboard}
+      />
       <SidebarInset>
         <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
           <SidebarTrigger className="-mr-1" />

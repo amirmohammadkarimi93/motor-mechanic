@@ -1,19 +1,31 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { buildMetadata, getSettings } from "@/lib/seo";
+import {
+  buildMetadata,
+  getSettings,
+  absoluteUrl,
+  breadcrumbStructuredData,
+} from "@/lib/seo";
 import { HeroSection } from "@/components/site/hero-section";
 import { FeaturesStrip } from "@/components/site/features-strip";
 import { StatsBand } from "@/components/site/stats-band";
 import { ServiceCard } from "@/components/site/service-card";
 import { CategoryCard } from "@/components/site/category-card";
-import { ArticleCard } from "@/components/site/article-card";
 import { CtaBand } from "@/components/site/cta-band";
 import { SectionHeading } from "@/components/site/section-heading";
-import { Button } from "@/components/ui/button";
+import { BrandsStrip } from "@/components/site/brands-strip";
+import { ProcessSteps, type ProcessStep } from "@/components/site/process-steps";
+import { TrustSignals } from "@/components/site/trust-signals";
+import { Testimonials, type Testimonial } from "@/components/site/testimonials";
+import { ServiceArea } from "@/components/site/service-area";
+import { FaqSection, type Faq } from "@/components/site/faq-section";
 import {
-  Wrench,
-  ChevronLeft,
-} from "lucide-react";
+  LatestArticles,
+  type LatestArticleItem,
+  type FilterCategory,
+} from "@/components/site/latest-articles";
+import { Button } from "@/components/ui/button";
+import { Wrench, ChevronLeft } from "lucide-react";
 
 export async function generateMetadata() {
   const settings = await getSettings();
@@ -34,46 +46,99 @@ function parseJSON<T>(str?: string | null): T | null {
   }
 }
 
+// Hardcoded popular searches pointing to category landing pages
+const POPULAR_SEARCHES = [
+  {
+    label: "تعمیر موتورگلکسی",
+    href: "/services/تعمیر-موتورگلکسی-در-مشهد",
+  },
+  {
+    label: "تعمیر موتور بنلی",
+    href: "/services/تعمیر-موتور-بنلی-در-مشهد",
+  },
+  {
+    label: "تعمیر موتور کراس",
+    href: "/services/تعمیر-موتور-کراس-در-مشهد",
+  },
+];
+
 async function getHomepageData() {
-  const [settings, services, featuredCategories, allCategories, latestArticles] =
-    await Promise.all([
-      db.siteSettings.findUnique({ where: { id: "singleton" } }),
-      db.service.findMany({
-        where: { published: true },
-        orderBy: { order: "asc" },
-        take: 6,
-      }),
-      db.category.findMany({
-        where: { published: true, featured: true },
-        orderBy: { order: "asc" },
-        take: 6,
-        include: { _count: { select: { articles: true } } },
-      }),
-      db.category.findMany({
-        where: { published: true },
-        orderBy: { order: "asc" },
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          brand: true,
-          city: true,
-          shortDescription: true,
-        },
-      }),
-      db.article.findMany({
-        where: { published: true },
-        orderBy: { publishedAt: "desc" },
-        take: 3,
-        include: { category: { select: { title: true, slug: true } } },
-      }),
-    ]);
+  const [
+    settings,
+    services,
+    featuredCategories,
+    allCategories,
+    latestArticles,
+    articleCategories,
+  ] = await Promise.all([
+    db.siteSettings.findUnique({ where: { id: "singleton" } }),
+    db.service.findMany({
+      where: { published: true },
+      orderBy: { order: "asc" },
+      take: 6,
+    }),
+    db.category.findMany({
+      where: { published: true, featured: true },
+      orderBy: { order: "asc" },
+      take: 6,
+      include: { _count: { select: { articles: true } } },
+    }),
+    db.category.findMany({
+      where: { published: true },
+      orderBy: { order: "asc" },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        brand: true,
+        city: true,
+        shortDescription: true,
+      },
+    }),
+    db.article.findMany({
+      where: { published: true },
+      orderBy: { publishedAt: "desc" },
+      take: 6,
+      include: { category: { select: { id: true, title: true, slug: true } } },
+    }),
+    db.category.findMany({
+      where: { published: true },
+      orderBy: { order: "asc" },
+      select: { id: true, title: true, slug: true },
+    }),
+  ]);
   return {
     settings,
     services,
     featuredCategories,
     allCategories,
     latestArticles,
+    articleCategories,
+  };
+}
+
+// Build ItemList JSON-LD for the services list (SEO)
+function buildItemListJsonLd(
+  services: { id: string; title: string; slug: string; description?: string | null }[]
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "خدمات تعمیر موتور سیکلت موتور مکانیک",
+    itemListElement: services.map((s, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      item: {
+        "@type": "Service",
+        name: s.title,
+        description: s.description ?? undefined,
+        url: absoluteUrl(`/services/${s.slug}`),
+        provider: {
+          "@type": "AutoRepair",
+          name: "موتور مکانیک",
+        },
+      },
+    })),
   };
 }
 
@@ -86,12 +151,48 @@ export default async function HomePage() {
   const stats = parseJSON<{ label: string; value: string; suffix?: string }[]>(
     settings?.stats
   );
+  const testimonialsData = parseJSON<Testimonial[]>(settings?.testimonials);
+  const faqsData = parseJSON<Faq[]>(settings?.faqs);
+  const processStepsData = parseJSON<ProcessStep[]>(settings?.processSteps);
+
+  // Enhance stats: ensure a 5th stat for "میانگین زمان تعمیر"
+  const enhancedStats = (() => {
+    if (!stats) return null;
+    const hasAvgTime = stats.some((s) =>
+      s.label.includes("زمان") || s.label.includes("میانگین")
+    );
+    if (hasAvgTime || stats.length >= 5) return stats;
+    return [
+      ...stats,
+      { label: "میانگین زمان تعمیر", value: "۲۴", suffix: " ساعت" },
+    ];
+  })();
 
   const aboutFirstParagraph =
     settings?.aboutContent?.split("\n\n").filter(Boolean)[0] || "";
 
+  // Build breadcrumb JSON-LD for homepage
+  const breadcrumbJsonLd = breadcrumbStructuredData([
+    { name: "خانه", url: "/" },
+  ]);
+
+  // Build ItemList JSON-LD for services
+  const itemListJsonLd = buildItemListJsonLd(data.services);
+
   return (
     <>
+      {/* Homepage structured data: Breadcrumb + ItemList */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbJsonLd),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+      />
+
       <HeroSection
         badge={settings?.heroBadge}
         title={settings?.heroTitle}
@@ -100,26 +201,44 @@ export default async function HomePage() {
         ctaText={settings?.heroCtaText}
         phone={settings?.phone}
         stats={stats ?? undefined}
+        popularSearches={POPULAR_SEARCHES}
       />
 
       {features && features.length > 0 && <FeaturesStrip features={features} />}
 
-      {/* Stats band */}
-      {stats && stats.length > 0 && <StatsBand stats={stats} />}
+      {/* Brands strip — pill listing of all categories */}
+      {data.allCategories.length > 0 && (
+        <BrandsStrip categories={data.allCategories} />
+      )}
 
-      {/* Services grid */}
+      {/* Stats band (enhanced with 5th stat) */}
+      {enhancedStats && enhancedStats.length > 0 && (
+        <StatsBand stats={enhancedStats} />
+      )}
+
+      {/* Services grid (enhanced) */}
       <section className="container mx-auto px-4 py-14 md:py-20">
         <SectionHeading
           eyebrow="خدمات ما"
           title="خدمات تخصصی تعمیر موتور سیکلت"
-          description="مجموعه‌ای کامل از خدمات تعمیراتی و سرویس برای موتور سیکلت شما با بهترین کیفیت."
+          description="مجموعه‌ای کامل از خدمات تعمیراتی و سرویس برای موتور سیکلت شما با بهترین کیفیت و قطعات اصلی."
         />
         <div className="mt-8 md:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {data.services.map((s, i) => (
-            <ServiceCard key={s.id} service={s} index={i} />
+            <ServiceCard
+              key={s.id}
+              service={s}
+              index={i}
+              phone={settings?.phone}
+            />
           ))}
         </div>
       </section>
+
+      {/* Process steps — 6-step horizontal flow */}
+      {processStepsData && processStepsData.length > 0 && (
+        <ProcessSteps steps={processStepsData} />
+      )}
 
       {/* Featured Categories */}
       {data.featuredCategories.length > 0 && (
@@ -150,6 +269,17 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {/* Why Choose Us / Trust signals */}
+      <TrustSignals />
+
+      {/* Testimonials */}
+      {testimonialsData && testimonialsData.length > 0 && (
+        <Testimonials testimonials={testimonialsData} />
+      )}
+
+      {/* Service area / cities served */}
+      <ServiceArea />
 
       {/* All Categories preview */}
       <section className="container mx-auto px-4 py-14 md:py-20">
@@ -230,33 +360,16 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Latest Articles */}
+      {/* Latest Articles (enhanced to 6 + filter pills) */}
       {data.latestArticles.length > 0 && (
-        <section className="container mx-auto px-4 py-14 md:py-20">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-            <SectionHeading
-              eyebrow="مقالات و راهنماها"
-              title="جدیدترین مقالات موتور سیکلت"
-              description="راهنماهای کاربردی برای نگهداری و تعمیر موتور سیکلت."
-            />
-            <Button
-              asChild
-              variant="ghost"
-              className="self-start md:self-end text-brand-700 hover:text-brand-800 hover:bg-brand-50"
-            >
-              <Link href="/articles">
-                همه مقالات
-                <ChevronLeft className="w-4 h-4 mr-1" />
-              </Link>
-            </Button>
-          </div>
-          <div className="mt-8 md:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {data.latestArticles.map((a, i) => (
-              <ArticleCard key={a.id} article={a} index={i} />
-            ))}
-          </div>
-        </section>
+        <LatestArticles
+          articles={data.latestArticles as LatestArticleItem[]}
+          categories={data.articleCategories as FilterCategory[]}
+        />
       )}
+
+      {/* FAQ section with JSON-LD */}
+      {faqsData && faqsData.length > 0 && <FaqSection faqs={faqsData} />}
 
       <CtaBand phone={settings?.phone} />
     </>

@@ -10,15 +10,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Admin user for the CMS panel
+// Admin user for the CMS panel with RBAC roles
+// Roles: super_admin | editor | author | landing_editor
+// - super_admin: full access (all modules + user management)
+// - editor: articles + categories(landings) + services + media + messages(read)
+// - author: articles (own) + media (own)
+// - landing_editor: categories(landings) + media + messages(read)
 model AdminUser {
   id        String   @id @default(cuid())
   username  String   @unique
   password  String
   name      String?
-  role      String   @default("admin")
+  email     String?
+  role      String   @default("author") // super_admin | editor | author | landing_editor
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Relations to content this user created
+  articles  Article[]
+  categories Category[]
+  media     Media[]
+
+  @@index([role])
+  @@index([active])
 }
 
 // Category = dynamic SEO page (e.g. "تعمیر موتورگلکسی در مشهد")
@@ -46,6 +61,9 @@ model Category {
   children        Category[] @relation("CategoryHierarchy")
   // Relations
   articles        Article[]
+  // Audit
+  authorId        String?
+  author          AdminUser? @relation(fields: [authorId], references: [id])
   // Display
   featured        Boolean  @default(false)
   published       Boolean  @default(true)
@@ -56,6 +74,7 @@ model Category {
   @@index([parentId])
   @@index([published])
   @@index([featured])
+  @@index([authorId])
 }
 
 // Article / blog post
@@ -76,6 +95,9 @@ model Article {
   // Relations
   categoryId      String?
   category        Category? @relation(fields: [categoryId], references: [id])
+  // Audit
+  authorId        String?
+  author          AdminUser? @relation(fields: [authorId], references: [id])
   // Meta
   authorName      String?
   readingTime     Int?     // minutes
@@ -91,6 +113,7 @@ model Article {
   @@index([published])
   @@index([featured])
   @@index([publishedAt])
+  @@index([authorId])
 }
 
 // Service offered by the repair shop
@@ -107,6 +130,27 @@ model Service {
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Media library - uploaded images with alt/title for accessibility + SEO
+model Media {
+  id          String   @id @default(cuid())
+  filename    String   // original filename
+  url         String   // stored path: /uploads/...
+  alt         String?  // alt text for accessibility (SEO)
+  title       String?  // title attribute
+  caption     String?  // optional caption
+  mimeType    String?
+  size        Int?     // bytes
+  width       Int?
+  height      Int?
+  // Audit
+  uploadedById String?
+  uploadedBy   AdminUser? @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([uploadedById])
+  @@index([createdAt])
 }
 
 // Singleton site settings (one row only)
@@ -138,6 +182,9 @@ model SiteSettings {
   // Homepage extras
   features        String? // JSON array
   stats           String? // JSON array of {label,value,suffix}
+  testimonials    String? // JSON array of {name, role, content, rating, avatar}
+  faqs            String? // JSON array of {question, answer}
+  processSteps    String? // JSON array of {step, title, description, icon}
   // Footer
   footerText      String?
   // Global SEO

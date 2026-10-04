@@ -25,6 +25,18 @@ import {
   Snowflake,
   Cpu,
   Lock,
+  Search,
+  Calculator,
+  Quote,
+  Award,
+  Users,
+  ThumbsUp,
+  Handshake,
+  BadgeCheck,
+  Truck,
+  PackageCheck,
+  DollarSign,
+  UserCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -55,6 +67,18 @@ const ICON_MAP: Record<string, LucideIcon> = {
   snowflake: Snowflake,
   cpu: Cpu,
   lock: Lock,
+  search: Search,
+  calculator: Calculator,
+  quote: Quote,
+  award: Award,
+  users: Users,
+  "thumbs-up": ThumbsUp,
+  handshake: Handshake,
+  "badge-check": BadgeCheck,
+  truck: Truck,
+  "package-check": PackageCheck,
+  "dollar-sign": DollarSign,
+  "user-check": UserCheck,
 };
 
 interface IconProps {

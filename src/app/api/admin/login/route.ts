@@ -5,6 +5,7 @@ import {
   loginAdmin,
   signToken,
   setSessionCookie,
+  type Role,
 } from "@/lib/auth";
 
 const schema = z.object({
@@ -33,30 +34,27 @@ export async function POST(req: NextRequest) {
 
   const { username, password } = parsed.data;
   const result = await loginAdmin(username, password);
-  if (!result.success) {
+  if (!result.success || !result.user) {
     return NextResponse.json(
       { ok: false, error: result.error ?? "نام کاربری یا رمز عبور اشتباه است" },
       { status: 401 }
     );
   }
 
-  const user = await db.adminUser.findUnique({ where: { username } });
-  if (!user) {
-    return NextResponse.json(
-      { ok: false, error: "کاربر یافت نشد" },
-      { status: 404 }
-    );
-  }
-
   const token = await signToken({
-    id: user.id,
-    username: user.username,
-    name: user.name ?? undefined,
+    id: result.user.id,
+    username: result.user.username,
+    name: result.user.name,
+    role: result.user.role,
   });
   await setSessionCookie(token);
 
   return NextResponse.json({
     ok: true,
-    user: { username: user.username, name: user.name ?? "" },
+    user: {
+      username: result.user.username,
+      name: result.user.name ?? "",
+      role: result.user.role,
+    },
   });
 }

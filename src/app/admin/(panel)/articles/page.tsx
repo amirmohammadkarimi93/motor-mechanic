@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getSession, getPermissionLevel } from "@/lib/auth";
 import { ArticlesTable } from "@/components/admin/articles-table";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,16 @@ export default async function ArticlesPage({ searchParams }: PageProps) {
   if (publishedParam === "published") where.published = true;
   if (publishedParam === "draft") where.published = false;
   if (publishedParam === "featured") where.featured = true;
+
+  const session = await getSession();
+  const permissionLevel = session
+    ? getPermissionLevel(session.role, "articles")
+    : "none";
+
+  // Authors with "own" permission only see their own articles in the list
+  if (permissionLevel === "own" && session) {
+    where.authorId = session.id;
+  }
 
   const [items, total, categories] = await Promise.all([
     db.article.findMany({
@@ -63,6 +74,8 @@ export default async function ArticlesPage({ searchParams }: PageProps) {
         categoryId={categoryId}
         published={publishedParam}
         categories={categories}
+        currentUserId={session?.id}
+        permissionLevel={permissionLevel}
       />
     </div>
   );

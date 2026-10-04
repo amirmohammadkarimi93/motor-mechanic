@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Search, Plus, Trash2, Pencil, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,7 +28,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { CategoryFormSheet } from "./category-form-sheet";
 import type { CategoryWithRelations } from "./types";
 
 interface CategoriesTableProps {
@@ -36,6 +36,10 @@ interface CategoriesTableProps {
   page: number;
   limit: number;
   search: string;
+  /** Current user id — used for own-only RBAC */
+  currentUserId?: string;
+  /** Permission level for the categories module */
+  permissionLevel: "none" | "own" | "all";
 }
 
 export function CategoriesTable({
@@ -44,14 +48,14 @@ export function CategoriesTable({
   page,
   limit,
   search,
+  currentUserId,
+  permissionLevel,
 }: CategoriesTableProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [searchValue, setSearchValue] = useState(search);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [editing, setEditing] = useState<CategoryWithRelations | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -81,7 +85,7 @@ export function CategoriesTable({
         method: "DELETE",
       });
       const data = await res.json();
-      if (!res.ok || !data.ok) {
+      if (!res.ok) {
         toast.error(data.error || "حذف ناموفق بود");
         return;
       }
@@ -94,13 +98,10 @@ export function CategoriesTable({
     }
   }
 
-  function openCreate() {
-    setEditing(null);
-    setSheetOpen(true);
-  }
-  function openEdit(item: CategoryWithRelations) {
-    setEditing(item);
-    setSheetOpen(true);
+  function canManage(item: CategoryWithRelations): boolean {
+    if (permissionLevel === "all") return true;
+    if (permissionLevel === "own") return item.authorId === currentUserId;
+    return false;
   }
 
   return (
@@ -116,14 +117,19 @@ export function CategoriesTable({
             className="pr-10"
           />
         </form>
-        <Button onClick={openCreate} className="bg-brand-600 hover:bg-brand-700 text-white">
-          <Plus className="size-4" />
-          افزودن دسته‌بندی جدید
+        <Button
+          asChild
+          className="bg-brand-600 hover:bg-brand-700 text-white"
+        >
+          <Link href="/admin/categories/new">
+            <Plus className="size-4" />
+            افزودن دسته‌بندی جدید
+          </Link>
         </Button>
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-xl border bg-card shadow-sm overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -143,93 +149,102 @@ export function CategoriesTable({
                 </TableCell>
               </TableRow>
             ) : (
-              items.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium max-w-[240px]">
-                    <div className="flex flex-col">
-                      <span className="truncate">{c.title}</span>
-                      {c.shortDescription && (
-                        <span className="text-xs text-muted-foreground truncate">
-                          {c.shortDescription}
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground font-mono">
-                    /{c.slug}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-sm">
-                    {c.brand ? <Badge variant="outline">{c.brand}</Badge> : "—"}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-sm">
-                    {c.city ? <Badge variant="outline">{c.city}</Badge> : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {c.featured && (
-                        <Badge className="bg-brand-500 hover:bg-brand-500 text-white">
-                          منتخب
-                        </Badge>
-                      )}
-                      {c.published ? (
-                        <Badge className="bg-emerald-500 hover:bg-emerald-500 text-white">
-                          منتشر
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">پیش‌نویس</Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        onClick={() => openEdit(c)}
-                        aria-label="ویرایش"
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
+              items.map((c) => {
+                const manageable = canManage(c);
+                return (
+                  <TableRow key={c.id}>
+                    <TableCell className="font-medium max-w-[240px]">
+                      <div className="flex flex-col">
+                        <span className="truncate">{c.title}</span>
+                        {c.shortDescription && (
+                          <span className="text-xs text-muted-foreground truncate">
+                            {c.shortDescription}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground font-mono">
+                      /{c.slug}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm">
+                      {c.brand ? <Badge variant="outline">{c.brand}</Badge> : "—"}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm">
+                      {c.city ? <Badge variant="outline">{c.city}</Badge> : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {c.featured && (
+                          <Badge className="bg-brand-500 hover:bg-brand-500 text-white">
+                            منتخب
+                          </Badge>
+                        )}
+                        {c.published ? (
+                          <Badge className="bg-emerald-500 hover:bg-emerald-500 text-white">
+                            منتشر
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">پیش‌نویس</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {manageable ? (
+                        <div className="flex gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="size-8 hover:bg-destructive/10 hover:text-destructive"
-                            disabled={deletingId === c.id}
-                            aria-label="حذف"
+                            className="size-8"
+                            asChild
+                            aria-label="ویرایش"
                           >
-                            {deletingId === c.id ? (
-                              <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="size-4" />
-                            )}
+                            <Link href={`/admin/categories/${c.id}`}>
+                              <Pencil className="size-4" />
+                            </Link>
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>حذف دسته‌بندی</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              آیا از حذف دسته‌بندی «{c.title}» مطمئن هستید؟ این عمل
-                              قابل بازگشت نیست و ممکن است روی مقالات مرتبط تأثیر بگذارد.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>انصراف</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(c.id)}
-                              className="bg-destructive text-white hover:bg-destructive/90"
-                            >
-                              حذف
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8 hover:bg-destructive/10 hover:text-destructive"
+                                disabled={deletingId === c.id}
+                                aria-label="حذف"
+                              >
+                                {deletingId === c.id ? (
+                                  <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="size-4" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>حذف دسته‌بندی</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  آیا از حذف دسته‌بندی «{c.title}» مطمئن هستید؟ این عمل
+                                  قابل بازگشت نیست و ممکن است روی مقالات مرتبط تأثیر بگذارد.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>انصراف</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDelete(c.id)}
+                                  className="bg-destructive text-white hover:bg-destructive/90"
+                                >
+                                  حذف
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -263,15 +278,6 @@ export function CategoriesTable({
           </div>
         </div>
       )}
-
-      <CategoryFormSheet
-        open={sheetOpen}
-        onOpenChange={(v) => {
-          setSheetOpen(v);
-          if (!v) setEditing(null);
-        }}
-        category={editing}
-      />
     </div>
   );
 }

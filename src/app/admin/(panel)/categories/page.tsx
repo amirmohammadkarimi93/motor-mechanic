@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getSession, getPermissionLevel } from "@/lib/auth";
 import { CategoriesTable } from "@/components/admin/categories-table";
 
 export const dynamic = "force-dynamic";
@@ -13,16 +14,24 @@ export default async function CategoriesPage({ searchParams }: PageProps) {
   const limit = Math.min(50, Math.max(1, parseInt((sp.limit as string) || "10", 10) || 10));
   const search = (sp.search as string) || "";
 
-  const where = search
-    ? {
-        OR: [
-          { title: { contains: search } },
-          { slug: { contains: search } },
-          { brand: { contains: search } },
-          { city: { contains: search } },
-        ],
-      }
-    : {};
+  const session = await getSession();
+  const permissionLevel = session
+    ? getPermissionLevel(session.role, "categories")
+    : "none";
+
+  const where: Record<string, unknown> = {};
+  if (search) {
+    where.OR = [
+      { title: { contains: search } },
+      { slug: { contains: search } },
+      { brand: { contains: search } },
+      { city: { contains: search } },
+    ];
+  }
+  // landing_editor with "own" permission only sees their own categories
+  if (permissionLevel === "own" && session) {
+    where.authorId = session.id;
+  }
 
   const [items, total] = await Promise.all([
     db.category.findMany({
@@ -50,6 +59,8 @@ export default async function CategoriesPage({ searchParams }: PageProps) {
         page={page}
         limit={limit}
         search={search}
+        currentUserId={session?.id}
+        permissionLevel={permissionLevel}
       />
     </div>
   );

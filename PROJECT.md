@@ -621,3 +621,183 @@ bun run lint
 برای هر تغییری، اول به این فایل مراجعه کنید. اگر چیزی نبود، به `worklog.md` (لاگ کار سابیجنت‌ها) یا کد مستقیم نگاه کنید.
 
 موفق باشید! 🏍️🔥
+
+---
+
+# 🆕 بروزرسانی‌های نسخه ۲ (V2 Updates)
+
+## 🔐 امنیت لاگین (اصلاح شد)
+- ❌ قبلاً فرم لاگین با GET password را در URL نشون می‌داد
+- ✅ حالا: حذف کامل `<form>` و `name` attribute از input‌ها
+- ✅ Button با `type="button" + onClick` مستقیم
+- ✅ Enter key handler روی input‌ها (بدون native form submit)
+- ✅ navigation با `window.location.href` برای full page reload
+- ✅ تایید شده با agent-browser: هیچ پسوردی در URL یا network logs نشون داده نمیشه
+
+## 📁 بخش رسانه (Media Library) - جدید
+مدیریت تصاویر سایت با امکان آپلود و ذخیره alt + title (مهم برای SEO و accessibility).
+
+### مسیرها
+- **صفحه پنل**: `/admin/media`
+- **API‌ها**:
+  - `POST /api/admin/media/upload` — آپلود (multipart/form-data با `file` + `alt` + `title`)
+  - `GET /api/admin/media?page=&limit=&search=` — لیست با pagination
+  - `GET/PUT/DELETE /api/admin/media/[id]` — CRUD یک رسانه
+
+### ویژگی‌ها
+- ✅ Drag & drop upload zone با پیشرفت آپلود زنده (XHR progress)
+- ✅ اعتبارسنجی: فقط تصاویر (jpeg, png, webp, gif)، حداکثر 10MB
+- ✅ ذخیره در `public/uploads/{timestamp}-{uuid}-{filename}`
+- ✅ خواندن ابعاد تصویر با `sharp`
+- ✅ فیلدهای alt و title (با importance برای SEO و screen readers)
+- ✅ ویرایش alt/title/caption در dialog
+- ✅ کپی URL به clipboard
+- ✅ حذف (هم فایل و هم رکورد DB)
+- ✅ RBAC: author فقط تصاویر خودش رو می‌بینه
+
+## 👥 سیستم کاربران و سطوح دسترسی (RBAC) - جدید
+
+### ۴ نقش (Roles)
+
+| Role (انگلیسی) | Label (فارسی) | دسترسی‌ها |
+|---------|--------|-----------|
+| `super_admin` | مدیر ارشد | همه چیز + مدیریت کاربران + تنظیمات |
+| `editor` | ویرایشگر | مقالات + دسته‌بندی‌ها + خدمات + رسانه + پیام‌ها |
+| `author` | نویسنده مقاله | مقالات (فقط خودش) + رسانه (فقط خودش) |
+| `landing_editor` | ویرایشگر لندینگ | دسته‌بندی‌ها + رسانه + پیام‌ها |
+
+### ماتریس دسترسی
+
+| Module | super_admin | editor | author | landing_editor |
+|--------|-------------|--------|--------|----------------|
+| داشبورد | ✅ | ✅ | ✅ | ✅ |
+| مقالات | همه | همه | خودش | ❌ |
+| دسته‌بندی‌ها | همه | همه | ❌ | همه |
+| خدمات | ✅ | ✅ | ❌ | ❌ |
+| رسانه | همه | همه | خودش | همه |
+| پیام‌ها | ✅ | ✅ | ❌ | ✅ |
+| تنظیمات | ✅ | ❌ | ❌ | ❌ |
+| کاربران | ✅ | ❌ | ❌ | ❌ |
+
+### کاربران پیش‌فرض (در seed)
+
+| Username | Password | Role |
+|----------|----------|------|
+| `admin` | `admin123` | super_admin |
+| `editor` | `editor123` | editor |
+| `author` | `author123` | author |
+| `landing` | `landing123` | landing_editor |
+
+### مسیرها
+- **صفحه مدیریت کاربران**: `/admin/users` (فقط super_admin)
+- **صفحه پروفایل**: `/admin/profile` (همه کاربران - تغییر رمز خودشون)
+- **API‌ها**:
+  - `GET /api/admin/users` — لیست کاربران با تعداد محتوای هرکدوم
+  - `POST /api/admin/users` — ایجاد کاربر جدید (با نقش)
+  - `GET/PUT/DELETE /api/admin/users/[id]` — CRUD یک کاربر
+  - `POST /api/admin/me/password` — تغییر رمز خود کاربر
+
+### محافظت‌های خودکار
+- ❌ نمی‌تونی خودت رو حذف کنی
+- ❌ نمی‌تونی خودت رو از super_admin به نقش پایین‌تر تبدیل کنی (lockout prevention)
+- ❌ نمی‌تونی آخرین super_admin رو حذف یا demote کنی
+- ❌ نمی‌تونی خودت رو deactivate کنی
+- ✅ هش bcrypt برای پسوردها
+- ✅ password hash هیچ‌وقت در response برگردونده نمیشه
+
+### UI Features
+- جدول با avatar (initials رنگی)، نقش‌ها با badge رنگی (red/orange/blue/green)
+- Inline toggle برای active/deactive
+- نمایش تعداد محتوای هر کاربر (مقالات | دسته‌بندی‌ها | رسانه)
+- Dialog با permission matrix - وقتی نقش رو انتخاب می‌کنی، نشون میده چه دسترسی‌هایی داره
+- Search + filter by role + pagination
+
+## 📄 ویرایشگرهای Full-Page - جدید
+
+قبلاً مقالات و دسته‌بندی‌ها در Sheet (slide-over کناری) ویرایش می‌شدن. حالا به full-page تبدیل شدن:
+
+### مسیرها
+- `/admin/articles/new` — ایجاد مقاله جدید (full page)
+- `/admin/articles/[id]` — ویرایش مقاله (full page)
+- `/admin/categories/new` — ایجاد دسته‌بندی/لندینگ (full page)
+- `/admin/categories/[id]` — ویرایش دسته‌بندی (full page)
+
+### Layout فرم
+- Breadcrumb در بالا (داشبورد > مقالات > مقاله جدید)
+- عنوان صفحه + دکمه بازگشت
+- ۲ ستونی responsive (main + sidebar) روی desktop
+- ستون main: عنوان، slug، خلاصه، تصویر کاور، محتوا (markdown editor)
+- ستون sidebar: publish settings، category، SEO accordion
+- Action bar پایین: "ذخیره"، "ذخیره و انتشار"، "انصراف"
+- auto-slug generation از title
+- preview تصویر کاور
+- icon picker با preview برای دسته‌بندی‌ها
+- RBAC enforcement: author فقط مقالات خودش رو ویرایش می‌کنه
+
+## 📈 صفحه اصلی کامل‌تر برای سئو - جدید
+
+### بخش‌های جدید اضافه شده (به ترتیب):
+1. **Hero (enhanced)**: popular searches pills زیر CTAها
+2. **Features strip** (موجود)
+3. **🆕 Brands Strip**: "تعمیر تخصصی تمام برندهای موتور سیکلت" + pill links به همه دسته‌بندی‌ها
+4. **Stats band (enhanced)**: حالا ۵ امار به جای ۴
+5. **Services grid (enhanced)**: "اطلاعات بیشتر" link روی هر کارت
+6. **🆕 Process Steps**: ۶ مرحله تعمیر با شماره، آیکون، عنوان، توضیح
+7. **Featured Categories** (موجود)
+8. **🆕 Trust Signals / Why Choose Us**: ۶ کارت مزیت
+9. **🆕 Testimonials**: ۴ نظر مشتری با rating ستاره، dark section
+10. **🆕 Service Area**: ۲۰ منطقه مشهد (local SEO)
+11. **About preview** (موجود)
+12. **Latest Articles (enhanced)**: ۶ مقاله به جای ۳ + filter pills
+13. **🆕 FAQ**: ۶ سوال متداول با Accordion
+14. **CTA band** (موجود)
+
+### JSON-LD Schemas اضافه‌شده
+- `FAQPage` schema (CRITICAL for rich results در Google)
+- `ItemList` schema برای services
+- `BreadcrumbList` schema
+- `AutoRepair` (موجود، از layout)
+
+### کامپوننت‌های جدید در `src/components/site/`
+- `process-steps.tsx`
+- `testimonials.tsx`
+- `faq-section.tsx`
+- `brands-strip.tsx`
+- `trust-signals.tsx`
+- `service-area.tsx`
+- `latest-articles.tsx` (enhanced)
+
+## ↗️ RTL کامل
+
+همه المان‌ها در سایت و پنل ادمین RTL هستن:
+- HTML: `<html dir="rtl" lang="fa">`
+- Sidebar سمت راست (با `side="right"` در shadcn)
+- Icons در سمت راست input‌ها (با `pr-10`)
+- ChevronLeft برای "next/forward" در RTL (درست反转 شده)
+- اعداد و تاریخ‌ها با `dir="ltr"` (درست)
+- Switchها، Badgeها، Accordion‌ها همه RTL-aware
+- Toast notifications در top-center
+
+## 🗄️ Prisma Schema Changes (v2)
+
+مدل‌های جدید/تغییر یافته:
+- `AdminUser`: اضافه شد `email`, `active`, relations به articles/categories/media
+- `Category`: اضافه شد `authorId` + `author` relation
+- `Article`: اضافه شد `authorId` + `author` relation
+- `Media` (NEW): `id, filename, url, alt, title, caption, mimeType, size, width, height, uploadedById, createdAt`
+- `SiteSettings`: اضافه شد `testimonials`, `faqs`, `processSteps` (JSON strings)
+
+## 🛠️ Maintenance / Development
+
+### Reset DB و reseed
+```bash
+bun run db:push  # اعمال schema
+bun run db:seed  # پر کردن داده‌ها (با 4 کاربر + 6 service + 5 category + 3 article + settings)
+```
+
+### Helper files
+- `src/lib/auth.ts` — RBAC helpers: `canAccess()`, `getPermissionLevel()`, `requireRole()`
+- `src/lib/roles.ts` — Client-safe RBAC definitions (برای use در client components)
+- `src/lib/slug.ts` — Slug generation (Persian-aware)
+- `src/lib/seo.ts` — Metadata + JSON-LD helpers
+

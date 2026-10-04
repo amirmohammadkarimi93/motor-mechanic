@@ -8,19 +8,65 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Seeding database...");
 
-  // 1. Admin user
+  // 1. Admin users with different roles
   const adminPassword = await bcrypt.hash("admin123", 10);
   await prisma.adminUser.upsert({
     where: { username: "admin" },
-    update: {},
+    update: { role: "super_admin" },
     create: {
       username: "admin",
       password: adminPassword,
-      name: "مدیر سایت",
-      role: "admin",
+      name: "مدیر ارشد سایت",
+      role: "super_admin",
+      email: "admin@motormechanic.ir",
     },
   });
-  console.log("✓ Admin user created (username: admin, password: admin123)");
+  console.log("✓ Super admin created (username: admin, password: admin123, role: super_admin)");
+
+  // Editor user - can manage articles + categories + services + media + messages
+  const editorPassword = await bcrypt.hash("editor123", 10);
+  await prisma.adminUser.upsert({
+    where: { username: "editor" },
+    update: { role: "editor" },
+    create: {
+      username: "editor",
+      password: editorPassword,
+      name: "ویرایشگر محتوا",
+      role: "editor",
+      email: "editor@motormechanic.ir",
+    },
+  });
+  console.log("✓ Editor created (username: editor, password: editor123, role: editor)");
+
+  // Author user - can only manage own articles + own media
+  const authorPassword = await bcrypt.hash("author123", 10);
+  await prisma.adminUser.upsert({
+    where: { username: "author" },
+    update: { role: "author" },
+    create: {
+      username: "author",
+      password: authorPassword,
+      name: "نویسنده مقالات",
+      role: "author",
+      email: "author@motormechanic.ir",
+    },
+  });
+  console.log("✓ Author created (username: author, password: author123, role: author)");
+
+  // Landing editor - can only manage categories (landing pages) + media
+  const landingPassword = await bcrypt.hash("landing123", 10);
+  await prisma.adminUser.upsert({
+    where: { username: "landing" },
+    update: { role: "landing_editor" },
+    create: {
+      username: "landing",
+      password: landingPassword,
+      name: "ویرایشگر لندینگ",
+      role: "landing_editor",
+      email: "landing@motormechanic.ir",
+    },
+  });
+  console.log("✓ Landing editor created (username: landing, password: landing123, role: landing_editor)");
 
   // 2. Site settings singleton
   await prisma.siteSettings.upsert({
@@ -53,6 +99,12 @@ async function main() {
         '[{"icon":"shield-check","title":"گارانتی معتبر","desc":"تمام تعمیرات با گارانتی ارائه می‌شوند"},{"icon":"wrench","title":"تیم متخصص","desc":"مکانیک‌های مجرب و دوره دیده"},{"icon":"zap","title":"خدمت سریع","desc":"تعمیر سریع و تحویل به موقع"},{"icon":"badge-indian-rupee","title":"قطعات اصلی","desc":"استفاده از قطعات اصل و درجه یک"}]',
       stats:
         '[{"label":"سال تجربه","value":"15","suffix":"+"},{"label":"موتور تعمیر شده","value":"5000","suffix":"+"},{"label":"رضایت مشتری","value":"98","suffix":"٪"},{"label":"برند موتور","value":"20","suffix":"+"}]',
+      testimonials:
+        '[{"name":"علی محمدی","role":"صاحب موتور بنلی","content":"بعد از گشتن زیاد بالاخره یک تعمیرگاه پیدا کردم که واقعا حرفه‌ای کار میکنه. موتور بنلی من رو مثل روز اول کردن.","rating":5,"avatar":""},{"name":"حسین رضایی","role":"راننده موتورگلکسی","content":"قیمت مناسب، کار باکیفیت و زمان تحویل دقیق. به همه دوستانم پیشنهاد میدم.","rating":5,"avatar":""},{"name":"مریم احمدی","role":"صاحب موتور کراس","content":"موتور کراس من بعد از یک تصادف نیاز به تعمیر اساسی داشت. تیم موتور مکانیک عالی کار کردن.","rating":5,"avatar":""},{"name":"رضا کریمی","role":"مشتری دائمی","content":"سه ساله موتورم رو فقط اینجا میبرم. همیشه راضی بودم. پشتیبانی عالی و خدمات باکیفیت.","rating":5,"avatar":""}]',
+      faqs:
+        '[{"question":"چه نوع موتور سیکلت‌هایی را تعمیر می‌کنید؟","answer":"ما در موتور مکانیک انواع موتور سیکلت‌های برندهای گلکسی، بنلی، کراس، آپریلیا، هوندا، یاماها و سایر برندهای داخلی و خارجی را تعمیر می‌کنیم. تیم ما تجربه گسترده‌ای در تعمیر موتورهای اسپرت، کلاسیک و آفرود دارد."},{"question":"آیا تعمیرات شما گارانتی دارد؟","answer":"بله، تمام تعمیرات ما با گارانتی معتبر ارائه می‌شوند. مدت گارانتی بسته به نوع تعمیر و قطعات استفاده شده متفاوت است و در زمان تحویل به اطلاع شما می‌رسد."},{"question":"هزینه تعمیر موتور سیکلت چقدر است؟","answer":"هزینه تعمیر بسته به نوع خرابی و قطعات مورد نیاز متفاوت است. شما می‌توانید با تماس با کارشناسان ما، هزینه تقریبی تعمیر موتور سیکلت خود را دریافت کنید. ما قبل از شروع کار، تخمین هزینه را به شما ارائه می‌دهیم."},{"question":"چقدر طول می‌کشد تا موتورم تعمیر شود؟","answer":"زمان تعمیر بسته به نوع خرابی متفاوت است. تعمیرات ساده معمولاً چند ساعت تا یک روز طول می‌کشد، در حالی که تعمیرات اساسی ممکن است چند روز زمان ببرد. ما تلاش می‌کنیم موتور شما را در سریع‌ترین زمان ممکن تحویل دهیم."},{"question":"آیا از قطعات اصلی استفاده می‌کنید؟","answer":"بله، ما فقط از قطعات اصلی و درجه یک استفاده می‌کنیم. تمام قطعات با گارانتی ارائه می‌شوند و ما هرگز از قطعات تقلبی یا بی‌کیفیت استفاده نمی‌کنیم."},{"question":"آیا برای تعمیر موتور سیکلت نوبت قبلی لازم است؟","answer":"برای تعمیرات تخصصی و بازرسی‌های کامل بهتر است قبلاً نوبت بگیرید. اما برای تعمیرات اضطراری و ساده می‌توانید بدون نوبت قبلی مراجعه کنید. برای نوبت‌دهی با ما تماس بگیرید."}]',
+      processSteps:
+        '[{"step":1,"title":"تماس و مشاوره","description":"با کارشناسان ما تماس بگیرید تا مشکل موتور سیکلت شما را بررسی کنیم","icon":"phone"},{"step":2,"title":"پذیرش و عیب‌یابی","description":"موتور سیکلت شما توسط متخصصین ما بررسی و عیب‌یابی می‌شود","icon":"search"},{"step":3,"title":"تخمین هزینه","description":"هزینه و زمان تعمیر به شما اعلام می‌شود و با تایید شما کار شروع می‌شود","icon":"calculator"},{"step":4,"title":"تعمیر تخصصی","description":"تیم متخصص ما با استفاده از تجهیزات مدرن و قطعات اصلی، موتور شما را تعمیر می‌کند","icon":"wrench"},{"step":5,"title":"کنترل کیفیت","description":"موتور سیکلت شما پس از تعمیر تست می‌شود تا از کیفیت کار اطمینان حاصل شود","icon":"shield-check"},{"step":6,"title":"تحویل با گارانتی","description":"موتور سیکلت شما آماده تحویل است با گارانتی معتبر و پشتیبانی کامل","icon":"badge-check"}]',
       footerText:
         "موتور مکانیک - مرکز تخصصی تعمیرات موتور سیکلت در مشهد. خدمات حرفه‌ای با گارانتی و قطعات اصلی.",
       metaTitle:
