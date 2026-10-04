@@ -31,24 +31,45 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.local
+.env.production
+.env.development
+
+# Keep .env.example (template)
+!.env.example
 
 # vercel
 .vercel
-
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 local-*
+
+# Agent context (internal logs)
+.agent-ctx
 .claude
 .z-ai-config
+
+# Logs
 *.log
 dev.log
 dev.out.log
-test
-prompt
-
 server.log
+prompt
+test
+
 # Skills directory
 /skills/
+
+# Database (SQLite - each user should create their own)
+/db/*.db
+/db/*.db-journal
+
+# Uploaded files (user-generated content at runtime)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# Generated scripts output
+/tmp/
